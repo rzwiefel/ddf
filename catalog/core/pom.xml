@@ -123,5 +123,6 @@
         <module>catalog-core-downloadaction</module>
         <module>catalog-core-metacardtype</module>
         <module>catalog-core-subscriptionstore</module>
+        <module>catalog-core-graphql</module>
     </modules>
 </project>
