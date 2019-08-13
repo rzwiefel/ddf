@@ -130,6 +130,7 @@ public interface AttributeType<T extends Serializable> extends Serializable {
      *
      * @see Serializable
      */
+    @Deprecated
     OBJECT
   }
 }

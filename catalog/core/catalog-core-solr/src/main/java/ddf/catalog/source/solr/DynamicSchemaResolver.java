@@ -138,6 +138,12 @@ public class DynamicSchemaResolver {
   private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory();
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DynamicSchemaResolver.class);
+  private static final String USE_INSECURE_JAVA_OBJECT_SERIALIZATION =
+      "danger.ddf.catalog.source.use-insecure-java-object-serialization";
+  private static final String EXPLICITLY_FAIL_JAVA_OBJECT_SERIALIZATION =
+      "danger.ddf.catalog.source.explicitly-fail-java-object-serialization";
+  public static final String FORBIDDEN_OBJECT_TYPE_USED_MESSAGE =
+      "Forbidden type of [AttributeFormat.OBJECT] used. Remove all object types as java object serialization is insecure";
 
   private Function<TinyTree, TinyBinary> tinyBinaryFunction;
 
@@ -196,9 +202,7 @@ public class DynamicSchemaResolver {
 
     anyTextFieldsCache.add(Metacard.METADATA + SchemaFields.TEXT_SUFFIX);
     Set<String> basicTextAttributes =
-        MetacardImpl.BASIC_METACARD
-            .getAttributeDescriptors()
-            .stream()
+        MetacardImpl.BASIC_METACARD.getAttributeDescriptors().stream()
             .filter(descriptor -> BasicTypes.STRING_TYPE.equals(descriptor.getType()))
             .map(stringDescriptor -> stringDescriptor.getName() + SchemaFields.TEXT_SUFFIX)
             .collect(Collectors.toSet());
@@ -302,8 +306,7 @@ public class DynamicSchemaResolver {
                       ad.getName() + getFieldSuffix(AttributeFormat.STRING))
                   == null) {
             List<Serializable> truncatedValues =
-                attributeValues
-                    .stream()
+                attributeValues.stream()
                     .map(
                         value ->
                             value != null
@@ -321,20 +324,29 @@ public class DynamicSchemaResolver {
                     + getSpecialIndexSuffix(AttributeFormat.STRING),
                 attributeValues);
           } else if (AttributeFormat.OBJECT.equals(format)) {
-            ByteArrayOutputStream byteArrayOS = new ByteArrayOutputStream();
-            List<Serializable> byteArrays = new ArrayList<>();
+            if (Boolean.getBoolean(System.getProperty(USE_INSECURE_JAVA_OBJECT_SERIALIZATION))) {
+              ByteArrayOutputStream byteArrayOS = new ByteArrayOutputStream();
+              List<Serializable> byteArrays = new ArrayList<>();
 
-            try (ObjectOutputStream out = new ObjectOutputStream(byteArrayOS)) {
-              for (Serializable serializable : attributeValues) {
-                out.writeObject(serializable);
-                byteArrays.add(byteArrayOS.toByteArray());
-                out.reset();
+              try (ObjectOutputStream out = new ObjectOutputStream(byteArrayOS)) {
+                for (Serializable serializable : attributeValues) {
+                  out.writeObject(serializable);
+                  byteArrays.add(byteArrayOS.toByteArray());
+                  out.reset();
+                }
+              } catch (IOException e) {
+                throw new MetacardCreationException(COULD_NOT_SERIALIZE_OBJECT_MESSAGE, e);
               }
-            } catch (IOException e) {
-              throw new MetacardCreationException(COULD_NOT_SERIALIZE_OBJECT_MESSAGE, e);
-            }
 
-            attributeValues = byteArrays;
+              attributeValues = byteArrays;
+            } else {
+              if (Boolean.getBoolean(
+                  System.getProperty(EXPLICITLY_FAIL_JAVA_OBJECT_SERIALIZATION))) {
+                throw new MetacardCreationException(FORBIDDEN_OBJECT_TYPE_USED_MESSAGE);
+              } else { // silently drop object types
+                LOGGER.debug(FORBIDDEN_OBJECT_TYPE_USED_MESSAGE);
+              }
+            }
           }
 
           if (AttributeFormat.GEOMETRY.equals(format)
@@ -527,24 +539,27 @@ public class DynamicSchemaResolver {
        */
       return Short.parseShort(docValue.toString());
     } else if (AttributeFormat.OBJECT.equals(format)) {
+      if (Boolean.getBoolean(System.getProperty(USE_INSECURE_JAVA_OBJECT_SERIALIZATION))) {
 
-      ByteArrayInputStream bais = null;
-      ObjectInputStream in = null;
+        ByteArrayInputStream bais = null;
+        ObjectInputStream in = null;
 
-      try {
-        bais = new ByteArrayInputStream((byte[]) docValue);
-        in = new ObjectInputStream(bais);
-        return (Serializable) in.readObject();
-      } catch (IOException e) {
-        LOGGER.info("IO exception loading input document", e);
-      } catch (ClassNotFoundException e) {
-        LOGGER.info("Could not create object to return.", e);
-        // TODO which exception to throw?
-      } finally {
-        IOUtils.closeQuietly(bais);
-        IOUtils.closeQuietly(in);
+        try {
+          bais = new ByteArrayInputStream((byte[]) docValue);
+          in = new ObjectInputStream(bais);
+          return (Serializable) in.readObject();
+        } catch (IOException e) {
+          LOGGER.info("IO exception loading input document", e);
+        } catch (ClassNotFoundException e) {
+          LOGGER.info("Could not create object to return.", e);
+          // TODO which exception to throw?
+        } finally {
+          IOUtils.closeQuietly(bais);
+          IOUtils.closeQuietly(in);
+        }
+      } else {
+          LOGGER.debug(FORBIDDEN_OBJECT_TYPE_USED_MESSAGE);
       }
-
       return null;
     } else {
       return ((Serializable) docValue);

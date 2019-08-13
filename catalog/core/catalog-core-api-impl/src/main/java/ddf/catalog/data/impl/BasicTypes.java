@@ -55,6 +55,7 @@ public class BasicTypes {
   public static final AttributeType<Integer> INTEGER_TYPE;
 
   /** A Constant for an {@link AttributeType} with {@link AttributeFormat#OBJECT}. */
+  @Deprecated
   public static final AttributeType<Serializable> OBJECT_TYPE;
 
   /** A Constant for an {@link AttributeType} with {@link AttributeFormat#SHORT}. */
