@@ -29,6 +29,6 @@
         </argument>
     </bean>
 
-    <service ref="definitionDeployer" interface="org.apache.felix.fileinstall.ArtifactInstaller"/>
+    <service ref="definitionDeployer" interface="org.apache.felix.fileinstall.ArtifactInstaller" />
 
 </blueprint>

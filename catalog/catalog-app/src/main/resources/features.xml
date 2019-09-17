@@ -491,7 +491,8 @@
     </feature>
 
     <feature name="catalog-core-definitionparser" version="${project.version}"
-             description="Provides the ability to define new metacard types, attributes, attribute validators, and default values via JSON files">
+             description="Provides the ability to define new metacard types, attributes, attribute validators, and default values via JSON files"
+            start-level="81">
         <feature>catalog-core-validator</feature>
         <bundle>mvn:ddf.catalog.core/catalog-core-definitionparser/${project.version}</bundle>
         <bundle>mvn:com.google.code.gson/gson/${gson.version}</bundle>
